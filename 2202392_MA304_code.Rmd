@@ -1,0 +1,542 @@
+---
+title: "MA304 Data Visualization"
+author: "Dheeraj"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  word_document: default
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Loading the pacakages that are required for analysis and visualization
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(RColorBrewer)
+library(shiny)
+library(leaflet)
+
+```
+
+## Introduction
+
+The data set 37-00049_UOF-P_2016_prepped contains information on Use of Force incidents by the police in Dallas, Texas in 2016. It includes details such as date, time, location, officer and suspect information, as well as type of force used, reason for use of force, and injury severity. Demographic data on suspects (race, gender, age) and officers (race, gender, years of experience) is also provided. Based on this data set, I have analyzed this data by Barplots , histograms , pie chart, line chart, scatter plot etc.
+
+```{r}
+Dallas_2016_ds = read.csv("E:\\DV_MA304\\Assignment\\37-00049_UOF-P_2016_prepped.csv")
+
+#data cleaning
+Dallas_2016_ds<-Dallas_2016_ds[-1,]
+Dallas_data<- Dallas_2016_ds
+```
+
+
+## Dimensions of the Dallas data set
+
+The given data set includes **2383 observations** and **47 variables**
+```{r}
+dim(Dallas_data)
+```
+
+## Plots for visualization
+
+**NOTE: In all the below plots , I used the plotly library to convert plot object into an interactive plot that can be zoomed, panned, and hovered over to display additional information.**
+
+### 1. Bar plot for officers based on gender
+
+```{r, echo=FALSE}
+data <- Dallas_data
+#### 1 Histogram for count of officers based on gender
+
+
+## Finding the number of officers based on their gender
+officer_gender <- data %>%
+  count(OFFICER_GENDER) 
+
+off_gender <- ggplot(officer_gender, aes(x = OFFICER_GENDER, y = n)) + 
+  geom_bar(stat = "identity", fill = "#C3EF00", color="black") + 
+  geom_text(aes(label = n), vjust=  -0.5) +
+  labs(x = "Gender", y = "Num_of_Officers", title  = "Officers by Gender")
+ggplotly(off_gender)
+
+```
+
+This bar plot shows the Number of officers based on Gender. It clearly shows that majority of the officers are Male i.e., 2143 and Female officers are 240.
+
+### 2. Bar plot for subjects based on gender
+
+```{r, echo=FALSE}
+##### 2 Histogram for count of subject based on gender
+
+p2<- ggplot(data, aes(x = SUBJECT_GENDER)) +
+  geom_bar(fill = "blue") +
+  theme_minimal() + 
+  labs(title = "Number of subjects by gender", 
+       x = "Gender", 
+       y = "Number of Subjects") +
+  scale_x_discrete(labels = c("Female" = "F", "Male" = "M"))
+
+ggplotly(p2, tooltip = c("x", "y"))
+
+
+```
+
+This bar plot shows the Number of subjects based on Gender. It clearly shows that majority of the subjects are Male i.e., 1932 and Female officers are 440.
+
+### 3. Bar plot for officers based on Race
+
+```{r, echo=FALSE}
+#### 3 Finding the number of officers based on their race
+
+officer_race <- data %>%
+  count(OFFICER_RACE) %>%
+  arrange(desc(n)) # Sort by descending order of count
+
+off_race <- ggplot(officer_race, aes(x = reorder(OFFICER_RACE, -n), y = n)) + 
+  geom_bar(stat = "identity", fill = "#0072A6", color="black") + 
+  geom_text(aes(label = n), vjust=-0.1) +
+  labs(x = "Race", y = "Number of officers", title  = "Officers by Race") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for better readability
+
+ggplotly(off_race)
+
+```
+
+This bar plot shows the Number of officers based on Race. It clearly shows that the top 3 races of officers include White (1478), Hispanic (482), Black (341). Majority of the officers are belonging to White race.
+
+### 4. Bar plot for Subjects based on Race
+
+```{r, echo=FALSE}
+#### 4 Histogram to show the number of subjects based on their Race
+
+sub_race <- data %>%
+count(SUBJECT_RACE)
+
+subject_race <- ggplot(sub_race, aes(x = SUBJECT_RACE, y = n)) + 
+  geom_bar(stat = "identity", fill = "#FE7F9D", color="black") + 
+  geom_text(aes(label = n), vjust=0.5) +
+  labs(x = "Race", y = "Number of Subjects", title  = "Subject by race")
+ggplotly(subject_race)
+
+```
+
+This bar plot shows the Number of subjects based on Race. It clearly shows that the top 3 races of subjects include Black (1333), Hispanic (524), white (470). Here Majority of subjects are Black.
+
+### 5. Create a Two-way table based on the type of force used on the number of subjects based on gender. It contains two columns Male and Female which denotes the count of male and female under that force. All Type of Forces is shown rows.
+
+```{r, echo=FALSE}
+#### 5 Two-way table based on subject gender and type of force used on them
+
+##Making all types of forces into single column to visualize them
+force_cols <- paste0("TYPE_OF_FORCE_USED", 1:10)
+#force_cols
+
+#Using pivot longer method to convert wide to long data
+
+data_long <- data %>% 
+  pivot_longer(cols = force_cols, names_to = "force_type_col", values_to = "force_type") %>%
+  drop_na(force_type) # drop any rows with missing force types
+#names(data_long)
+
+data_long_gender <- data_long %>% 
+  filter(SUBJECT_GENDER %in% c("Male", "Female"))
+
+#Creating the two-way contingency table to visualize the type of forces used with respect to the subject gender
+table_force_gender <- table(data_long_gender$force_type, data_long_gender$SUBJECT_GENDER)
+table_force_gender=table_force_gender[-1,]
+table_force_gender
+
+```
+
+### 6. Plot a heat map that visualizes the two-way table.
+
+```{r, echo=FALSE}
+# Convert the two-way table into a data frame 
+
+df = as.data.frame(table_force_gender)
+#df
+
+#### 6 Plotting Heat map for the two-way table to visualize the force based on gender
+
+heat_map<-ggplot(data = as.data.frame(table_force_gender),
+       aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(title = "Two way table showing Force Type and Gender",
+       x = "Gender",
+       y = "Force_Type") +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(heat_map)
+
+```
+
+This heat map colour ranges from white to red colour states that frequency of males and females from 0 – 1000. It clearly shows that Verbal command is the most used force both and Males (1034) and Females (264).
+
+### 7. Pie chart that shows the participation of subjects based on Race in the               Incidents
+```{r, echo=FALSE}
+# Convert the two-way table into a data frame 
+
+# 7  Pie chart to visualize the distribution of reason for incidents
+
+# Create a new column for subject race grouped into Black, White, and Other categories
+data$SUBJECT_RACE_GROUPED <- ifelse(data$SUBJECT_RACE %in% c("Black"), "Black", 
+                                    ifelse(data$SUBJECT_RACE == "White", "White",
+                                           ifelse(data$SUBJECT_RACE == "Hispanic", "Hispanic","Other")))
+
+# Calculate percentages
+
+# Calculate percentages and create a new column with concatenated values
+subject_race_counts <- data %>%
+  group_by(SUBJECT_RACE_GROUPED) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(count / sum(count) * 100),
+         info = paste("RACE:", SUBJECT_RACE_GROUPED, "<br>Count:", count, "<br>Percent:", percent, "%"))
+
+# Create a pie chart with percentages and information displayed
+pie_chart <- plot_ly(subject_race_counts, labels = ~SUBJECT_RACE_GROUPED, values = ~count, type = "pie",
+                     marker = list(colors = RColorBrewer::brewer.pal(8, "Set2")),
+                     text = ~info, hoverinfo = "text") %>%
+  layout(title = list(text = "Participation of Subjects in the incidents based on their Race", x = 0.2))
+
+# Display the pie chart
+pie_chart
+
+```
+
+This pie chart shows the distribution of subjects with respect to their race, the different colours represent different races as mentioned in legends. This plot clearly depicts that 55.9% of Black people participated in the incident. By hovering on the plot, we can see the number of subjects and the rounded percentage of subjects involved in the incidents.
+
+### 8. Plot a stacked bar plot using facet grid based on subject gender
+
+```{r, echo=FALSE}
+#### 8 Create a stacked bar plot using faceting
+
+# Subset the data to only include the relevant columns and filter by male and female genders
+data_subset <- data %>% 
+  filter(SUBJECT_GENDER %in% c("Male", "Female")) %>%
+  select(SUBJECT_RACE_GROUPED, SUBJECT_GENDER, SUBJECT_WAS_ARRESTED)
+
+p8 <- ggplot(data_subset, aes(x = SUBJECT_RACE_GROUPED, fill = SUBJECT_WAS_ARRESTED)) +
+  geom_bar() +
+  facet_wrap(~ SUBJECT_GENDER) +
+  labs(x = "Subject Race", y = "Count", fill = "Subject Was Arrested")
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplotly(p8)
+
+```
+
+The above plot has two facet grids showing male and female in each of that it shows that how many subjects of particular race are arrested or not arrested. It clearly shows that irrespective of gender more number black people got arrested  when compared to the other races. By hovering that we can get the details of count showing that number of subjects arrested.
+
+### 9. Barplot that shows officers years on force and injury status based on gender
+
+```{r, echo=FALSE}
+# Subset the data to only include white and black officers
+data_subset_ofc <- data %>%
+  filter(OFFICER_RACE %in% c("White", "Black"))
+
+# Create a density plot with facets for officer gender
+p9 <- ggplot(data_subset_ofc, aes(x = OFFICER_YEARS_ON_FORCE, fill = OFFICER_INJURY)) +
+  geom_bar(position="stack") +
+  labs(x = "Years on Force", y = "Number of Officers", fill = "Officer Injury") +
+  facet_grid(OFFICER_RACE ~ .) +
+  ggtitle("Number of Officers by Years on Force and Injury Status, by Officer Race") 
+
+# Display the plot
+ggplotly(p9)
+
+
+
+```
+
+This plot gives us the clear information about an officer whether he is injured or not based on their race and how many officers are injured or not by hovering on the plot(In this plot i considered only black and white as most of them belongs to these races.)
+
+### 10. Plot a Line chart that shows number of incident happened in each division.
+
+```{r, echo=FALSE}
+#### 10 Line chart for Number of Incidents per Division
+
+p10<-data %>% 
+  group_by(DIVISION) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(x = DIVISION, y = count, group = 1)) +
+  geom_line(color = "#2E86C1", size = 1) +
+  xlab("Division") +
+  ylab("Number of Incidents") +
+  ggtitle("Number of Incidents by Division (Line Chart)")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+ggplotly(p10)
+
+```
+
+It shown that maximum number of incidents occurred in CENTRAL (563) and NORTHWEST has a less number of incidents (191).
+
+### 11. Grouped Bar chart showing the Type of force used on the subjects based on their Race (Group of 4 races with different colours as shown in the legends)
+
+```{r, echo=FALSE}
+#### 11 Grouped Bar chart for type of force used based on the subject Race
+
+
+# Create a new column for subject race grouped into Black, White, and Other categories
+
+#data$SUBJECT_RACE_GROUPED <- ifelse(data$SUBJECT_RACE %in% c("Black"), "Black", 
+                                   # ifelse(data$SUBJECT_RACE == "White", "White",
+                                           #ifelse(data$SUBJECT_RACE == "Hispanic", "Hispanic","Other")))
+
+#colors <- c('#FFA500','#4B0082','#00CED1')
+
+  colors<-c('#1F77B4','#FF7F0E','#2CA02C','#D62728')
+
+#colors <- c('#FFA500','#4B0082','#00CED1', "#F0E442")
+p11 <- data %>% 
+  group_by(SUBJECT_RACE_GROUPED, TYPE_OF_FORCE_USED1) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(x = TYPE_OF_FORCE_USED1, y = count, fill = SUBJECT_RACE_GROUPED)) +
+  geom_col(position = "dodge") +
+  xlab("Type of Force") +
+  ylab("Number of Incidents") +
+  ggtitle("Type of Force Used based on the Subject Race") +
+  scale_fill_manual(values = colors)+
+  theme(axis.text.x = element_text(size  = 8,angle = 45,
+                                                  hjust = 1,
+                                                  vjust = 1))
+ggplotly(p11)
+
+
+```
+
+This clearly shows that Verbal command is the mostly used type of force on the subjects irrespective of their race and most of forces are used on subjects of black race.
+
+### 12. Scatter plot that shows the Subject was arrested or not based on the incident reason and location district 
+
+```{r, echo=FALSE}
+# 11 scatter plot of location district vs. incident reason, colored by subject arrested or not
+p12 <- ggplot(data, aes(x=LOCATION_DISTRICT, y=INCIDENT_REASON, color=SUBJECT_WAS_ARRESTED)) +
+  geom_point() +
+  labs(x="Location District", y="Incident Reason", title="Scatter plot of Location District vs Incident_Reason") +
+  scale_color_manual(values=c("blue","red"), labels=c("Not Arrested", "Arrested"))+
+                       theme_minimal()+theme(panel.background = element_blank(),
+                                             panel.grid.major = element_blank(),
+                                             panel.grid.minor = element_blank())
+
+ggplotly(p12)
+
+
+
+```
+
+This scatter shows the Arrest status(Arrested or Not) of the subject based on the district and Reason of incident occurred.
+
+### 13. Scatter plot that shows the incident reason and number of incidents based on the Division and subject Race.
+
+```{r, echo=FALSE}
+# 13 
+# Group data by subject race, division, and incident reason, and count the number of incidents
+df_grouped <- data %>%
+  group_by(SUBJECT_RACE_GROUPED, DIVISION, INCIDENT_REASON) %>%
+  summarize(Num_Incidents = n())
+
+# Define color palette
+colors <- brewer.pal(9, "YlOrRd")
+
+# Plot scatter plot with size of dots representing number of incidents and text showing incident reason
+p13 <- ggplot(df_grouped, aes(x=DIVISION, y=SUBJECT_RACE_GROUPED, size=Num_Incidents, color=Num_Incidents, 
+                              text=paste("Reason: ", INCIDENT_REASON, "\nNum Incidents: ", Num_Incidents))) +
+  geom_point(alpha=0.7) +
+  scale_color_gradientn(colors = colors, limits=c(0, max(df_grouped$Num_Incidents))) +
+  scale_size(range=c(5, 15)) +
+  labs(x="Division", y="Subject Race", title="Dallas UOF Incidents by Subject Race and Division") +
+  theme_bw() +
+  theme(legend.position="bottom", legend.title=element_blank(), axis.text.x=element_text(angle=90, hjust=1))
+
+# Convert ggplot object into an interactive plot
+ggplotly(p13, tooltip = c("text"))
+
+
+
+```
+
+This plot clearly shows the number of incidents ranges from Yellow to Red and different sizes(based on the number of incidents) and colours of  circles plotted on the graph  shows the incident reason and number of those incidents occurred based on the particular Division and Subject Race. By hovering on the circles can get clear information.
+
+### 14. Grouped Bar chart representing the number of incidents and the reason for incident based on the particular Division.
+
+```{r, echo=FALSE}
+# 14 Group data by division and incident reason, and count the number of incidents
+df_grouped <- data %>%
+  group_by(INCIDENT_REASON, DIVISION) %>%
+  summarize(Num_Incidents = n())
+
+# Define color palette
+colors <- rev(brewer.pal(7, "Reds"))
+
+# Plot bar chart with incident reason on x-axis and location district as legend
+p14 <- ggplot(df_grouped, aes(x=INCIDENT_REASON, y=Num_Incidents, fill=DIVISION)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_manual(values=colors) +
+  labs(x="Incident Reason", y="Number of Incidents", title="Dallas UOF Incidents by Incident Reason and Location District") +
+  theme_bw() +
+  theme(legend.position="bottom", legend.title=element_blank(),
+        axis.text.x=element_text(angle=90, vjust=0.5, hjust=1))
+ggplotly(p14)
+
+
+
+```
+
+This clearly tells that the most of incidents occurred in CENTRAL division and it shows the number of incidents occured in each division with a particular incident reason
+
+### 15. Plot **Time series** data that gives the number of incidents based on each month of 2016. 
+
+For Visualizing Time series Data, we need to make sure that all date columns should be in correct date format, if not those should be converted into Date format. We can extract hours , minutes , days , months from the Date and it can be used in depth analysis of the data.In the below time series plots,Month is extracted and used in analysis of the data.
+
+```{r, echo=FALSE}
+######################TIME SERIES
+
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%m/%d/%Y")
+data$INC_MONTH <-format(data$INCIDENT_DATE,"%m")
+df_month <-  data %>%
+  group_by(INC_MONTH) %>%
+  summarize(count = n())
+
+## Line chart
+ts1 <- ggplot(df_month, aes(x = factor(INC_MONTH, levels = sprintf("%02d", 1:12)), y = count, group = 1)) +
+  geom_line(size = 1, colour = "steelblue") +
+  labs(x = "MONTH", y = "INCIDENT COUNTS", title = "Num_of_incidents per month") +
+  scale_x_discrete(labels = month.name) +
+  theme_bw()+
+  theme(legend.position="bottom", legend.title=element_blank(),
+        axis.text.x=element_text(angle=45, vjust=0.5, hjust=1))
+ggplotly(ts1)
+
+
+
+```
+
+In the Line chart,It clearly seen that at the  starting of year, In March maximum number of incidents (264) occurred and at end of year , Less number of incidents occurred in the month of December (100).
+
+### 16. Line chart that depicts relation between the month and number of incidents based on the subject race.
+
+```{r, echo=FALSE}
+######################TIME SERIES
+
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%m/%d/%Y")
+data$INC_MONTH <- format(data$INCIDENT_DATE, "%m")
+
+df_month_race <- data %>%
+  group_by(INC_MONTH, SUBJECT_RACE_GROUPED) %>%
+  summarize(count = n())
+
+ts2 <- ggplot(df_month_race, aes(x = factor(INC_MONTH, levels = sprintf("%02d", 1:12)), y = count, group = SUBJECT_RACE_GROUPED, color = SUBJECT_RACE_GROUPED)) +
+  geom_line(size = 1) +
+  labs(x = "MONTH", y = "INCIDENT COUNTS", title = "Num_of_incidents per month by race") +
+  scale_x_discrete(labels = month.name) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1))
+
+ggplotly(ts2)
+
+
+```
+
+This Line chart shows the races of subjects in a different line colours (shown in the legend).Line of Black race subjects shown in high trend compared to Hispanic and white Races.These both races has a similar trend.
+
+
+
+### 17. Scatter plot that shows the number of incidents based on the month .
+
+```{r, echo=FALSE}
+######################TIME SERIES
+
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%m/%d/%Y")
+data$INC_MONTH <-format(data$INCIDENT_DATE,"%m")
+df_month <-  data %>%
+  group_by(INC_MONTH) %>%
+  summarize(count = n())
+
+
+
+
+
+
+ts3 <- ggplot(df_month, aes(x = factor(INC_MONTH, levels = sprintf("%02d", 1:12)), y = count, group = 1)) +
+  geom_point(size = 3, color = "steelblue", aes(text = paste("Month:", month.name[as.numeric(df_month$INC_MONTH)], "<br>Count:", count))) +
+  geom_smooth(method = "loess", se = FALSE, color = "red", aes(text = paste("Month:", month.name[as.numeric(df_month$INC_MONTH)], "<br>Average:", round(..y.., 2)))) +
+  labs(x = "MONTH", y = "INCIDENT COUNTS", title = "Num_of_incidents per month") +
+  scale_x_discrete(labels = month.abb) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1))
+
+ggplotly(ts3, tooltip = "text")
+
+
+```
+
+In this plot, a **smoothed line** is added using the geom_smooth() function with the **method = "loess" parameter**. This method estimates the relationship between the variables by fitting a smooth curve through the plotted points using local weighted regression. The smooth line represents the overall trend of the data and provides a visual representation of the relationship between the x and y variables.This method loess is similar to Average. This smoothed line represents the average number of incidents occured in every month
+
+### 18. Create a Map of Dallas Location using Leaflet Library.
+
+```{r, echo=FALSE}
+# Dallas location
+dallas <- c(32.7767, -96.7970)
+
+# create map
+map <- leaflet() %>%
+  addTiles() %>%
+  setView(lng = dallas[2], lat = dallas[1], zoom = 10) %>%
+  addMarkers(lng = dallas[2], lat = dallas[1], popup = "Dallas")
+
+# display map
+map
+
+
+```
+
+This map shows the Location of the City Dallas where the crimes are happened in the year 2016 mentioned in the given dataset.
+
+### 19. Marking the circles on the map where the incident occurred.
+
+```{r, echo=FALSE}
+# Create a new data frame with only the required columns
+df_location <- data.frame(
+  city = data$LOCATION_CITY,
+  inc_res = data$INCIDENT_REASON,
+  street = data$STREET_NAME,
+  latitude = as.numeric(data$LOCATION_LATITUDE),
+  longitude = as.numeric(data$LOCATION_LONGITUDE)
+)
+
+# Remove rows with null values for latitude or longitude
+df_location <- df_location[complete.cases(df_location$latitude, df_location$longitude),]
+
+
+# Create a leaflet map with circle markers for each incident location
+map <- leaflet(df_location) %>%
+  addTiles() %>%
+  #addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircleMarkers(radius = 5, color = "red", fillOpacity = 0.5, popup = paste0("City: ", df_location$city, 
+                                                                                "<br>Street: ", df_location$street, 
+                                                                                "<br>Incident Reason: ", df_location$inc_res)) %>%
+  setView(lng = -96.796988, lat = 32.776665, zoom = 10)
+
+# Display the map
+map
+
+
+
+```
+
+This Map shows the information by clicking on those red circle markers, it shows in which street the incident occurs and the incident reason.
+
+
+
+
+
+
+
+
+
+
