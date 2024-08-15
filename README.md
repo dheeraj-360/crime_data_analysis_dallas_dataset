@@ -1,2 +1,1 @@
-# crime_data_analysis_dallas_dataset
-Exploratory Data Analysis and Data Visualization of Dallas, Texas in 2016
+# Exploratory Data Analysis and Data Visualization of Dallas, Texas in 2016
